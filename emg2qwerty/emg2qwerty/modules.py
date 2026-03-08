@@ -8,6 +8,7 @@ from collections.abc import Sequence
 
 import torch
 from torch import nn
+from torch.nn.utils import weight_norm  # Required for TCN stability
 
 
 class SpectrogramNorm(nn.Module):
@@ -279,37 +280,46 @@ class TDSConvEncoder(nn.Module):
     def forward(self, inputs: torch.Tensor) -> torch.Tensor:
         return self.tds_conv_blocks(inputs)  # (T, N, num_features)
 
+import torch.nn as nn
+from torch.nn.utils import weight_norm
+
+class TCNBlock(nn.Module):
+    def __init__(self, in_ch, out_ch, kernel_size, dilation, dropout):
+        super().__init__()
+        padding = (kernel_size - 1) * dilation
+        
+        # Standard TCNs use two convolutions per residual block
+        self.conv = weight_norm(nn.Conv1d(in_ch, out_ch, kernel_size, 
+                                         dilation=dilation, padding=0))
+        self.pad = nn.ConstantPad1d((padding, 0), 0)
+        self.relu = nn.ReLU()
+        self.dropout = nn.Dropout(dropout)
+        
+        # Residual connection: if in/out channels differ, use a 1x1 conv to match
+        self.res_match = nn.Conv1d(in_ch, out_ch, 1) if in_ch != out_ch else nn.Identity()
+
+    def forward(self, x):
+        res = self.res_match(x)
+        out = self.pad(x)
+        out = self.conv(out)
+        out = self.relu(out)
+        out = self.dropout(out)
+        return self.relu(out + res) # The "Skip Connection"
+
 class TCNEncoder(nn.Module):
-    def __init__(
-        self,
-        num_features: int,
-        num_channels: Sequence[int] = (64, 64, 64, 64),
-        kernel_size: int = 3,
-        dropout: float = 0.2,
-    ) -> None:
+    def __init__(self, num_features, num_channels, kernel_size=3, dropout=0.2):
         super().__init__()
         layers = []
         for i in range(len(num_channels)):
             dilation = 2 ** i
-            in_ch = num_features if i == 0 else num_channels[i - 1]
-            out_ch = num_channels[i]
-            
-            # Causal padding ensures the output at time t only depends on t and earlier
-            padding = (kernel_size - 1) * dilation
-            
-            layers.append(nn.Sequential(
-                nn.ConstantPad1d((padding, 0), 0),
-                nn.Conv1d(in_ch, out_ch, kernel_size, dilation=dilation),
-                nn.ReLU(),
-                nn.Dropout(dropout)
-            ))
+            in_ch = num_features if i == 0 else num_channels[i-1]
+            layers.append(TCNBlock(in_ch, num_channels[i], kernel_size, dilation, dropout))
+        
         self.network = nn.Sequential(*layers)
         self.final_proj = nn.Linear(num_channels[-1], num_features)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # Input: (T, N, C) -> Conv1d expects (N, C, T)
-        x = x.permute(1, 2, 0)
+    def forward(self, x):
+        x = x.permute(1, 2, 0) # (N, C, T)
         x = self.network(x)
-        # Back to (T, N, C)
-        x = x.permute(2, 0, 1)
+        x = x.permute(2, 0, 1) # (T, N, C)
         return self.final_proj(x)
