@@ -28,6 +28,9 @@ from emg2qwerty.modules import (
 )
 from emg2qwerty.transforms import Transform
 
+# Added this for TCN
+from emg2qwerty.modules import TCNEncoder
+
 
 class WindowedEMGDataModule(pl.LightningDataModule):
     def __init__(
@@ -268,4 +271,15 @@ class TDSConvCTCModule(pl.LightningModule):
             self.parameters(),
             optimizer_config=self.hparams.optimizer,
             lr_scheduler_config=self.hparams.lr_scheduler,
+        )
+
+class TCNCTCModule(TDSConvCTCModule):
+    def __init__(self, *args, num_channels, kernel_size, dropout, **kwargs):
+        super().__init__(*args, **kwargs)
+        num_features = self.NUM_BANDS * self.hparams.mlp_features[-1]
+        self.model[3] = TCNEncoder(
+            num_features=num_features,
+            num_channels=num_channels,
+            kernel_size=kernel_size,
+            dropout=dropout
         )
