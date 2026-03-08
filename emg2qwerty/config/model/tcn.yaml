@@ -1,0 +1,8 @@
+# @package _global_
+module:
+  _target_: emg2qwerty.lightning.TCNCTCModule
+  in_features: 528
+  mlp_features: [384]
+  num_channels: [64, 64, 64, 64, 64, 64] # Deeper than the TDS baseline
+  kernel_size: 3
+  dropout: 0.2
