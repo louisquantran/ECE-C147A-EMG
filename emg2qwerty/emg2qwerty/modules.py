@@ -278,3 +278,38 @@ class TDSConvEncoder(nn.Module):
 
     def forward(self, inputs: torch.Tensor) -> torch.Tensor:
         return self.tds_conv_blocks(inputs)  # (T, N, num_features)
+
+class TCNEncoder(nn.Module):
+    def __init__(
+        self,
+        num_features: int,
+        num_channels: Sequence[int] = (64, 64, 64, 64),
+        kernel_size: int = 3,
+        dropout: float = 0.2,
+    ) -> None:
+        super().__init__()
+        layers = []
+        for i in range(len(num_channels)):
+            dilation = 2 ** i
+            in_ch = num_features if i == 0 else num_channels[i - 1]
+            out_ch = num_channels[i]
+            
+            # Causal padding ensures the output at time t only depends on t and earlier
+            padding = (kernel_size - 1) * dilation
+            
+            layers.append(nn.Sequential(
+                nn.ConstantPad1d((padding, 0), 0),
+                nn.Conv1d(in_ch, out_ch, kernel_size, dilation=dilation),
+                nn.ReLU(),
+                nn.Dropout(dropout)
+            ))
+        self.network = nn.Sequential(*layers)
+        self.final_proj = nn.Linear(num_channels[-1], num_features)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # Input: (T, N, C) -> Conv1d expects (N, C, T)
+        x = x.permute(1, 2, 0)
+        x = self.network(x)
+        # Back to (T, N, C)
+        x = x.permute(2, 0, 1)
+        return self.final_proj(x)
