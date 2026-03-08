@@ -282,16 +282,26 @@ class TCNCTCModule(TDSConvCTCModule):
         dropout: float, 
         **kwargs
     ) -> None:
-        # Pass num_channels as 'block_channels' and kernel_size as 'kernel_width' 
-        # to satisfy the TDSConvCTCModule constructor requirements
+        # 1. Use .get() with defaults to avoid KeyError. 
+        # This handles cases where Hydra might nest these keys.
+        self.custom_lr = kwargs.get('lr', 0.002) 
+        self.custom_weight_decay = kwargs.get('weight_decay', 1e-4)
+        
+        # 2. Filter kwargs to prevent passing 'lr' and 'weight_decay' to the parent
+        # since we know TDSConvCTCModule doesn't want them.
+        parent_kwargs = {k: v for k, v in kwargs.items() if k not in ['lr', 'weight_decay']}
+        
         super().__init__(
             *args, 
             block_channels=num_channels, 
             kernel_width=kernel_size, 
-            **kwargs
+            **parent_kwargs
         )
         
-        # Replace the TDS encoder with the TCN encoder
+        # 3. Save ALL hyperparams to ensure the final Results Chart generates
+        self.save_hyperparameters("num_channels", "kernel_size", "dropout", "lr", "weight_decay")
+        
+        # 4. Initialize the 128-channel encoder
         num_features = self.NUM_BANDS * self.hparams.mlp_features[-1]
         self.model[3] = TCNEncoder(
             num_features=num_features,
