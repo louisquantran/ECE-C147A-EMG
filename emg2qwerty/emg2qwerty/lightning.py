@@ -274,8 +274,24 @@ class TDSConvCTCModule(pl.LightningModule):
         )
 
 class TCNCTCModule(TDSConvCTCModule):
-    def __init__(self, *args, num_channels, kernel_size, dropout, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(
+        self, 
+        *args, 
+        num_channels: Sequence[int], 
+        kernel_size: int, 
+        dropout: float, 
+        **kwargs
+    ) -> None:
+        # Pass num_channels as 'block_channels' and kernel_size as 'kernel_width' 
+        # to satisfy the TDSConvCTCModule constructor requirements
+        super().__init__(
+            *args, 
+            block_channels=num_channels, 
+            kernel_width=kernel_size, 
+            **kwargs
+        )
+        
+        # Replace the TDS encoder with the TCN encoder
         num_features = self.NUM_BANDS * self.hparams.mlp_features[-1]
         self.model[3] = TCNEncoder(
             num_features=num_features,
