@@ -278,3 +278,99 @@ class TDSConvEncoder(nn.Module):
 
     def forward(self, inputs: torch.Tensor) -> torch.Tensor:
         return self.tds_conv_blocks(inputs)  # (T, N, num_features)
+
+class TemporalConvBlock(nn.Module):
+    """Residual 1D temporal convolution block for inputs of shape (T, N, C).
+
+    Uses same-padding (odd kernel widths) so the temporal length is preserved.
+    """
+
+    def __init__(
+        self,
+        in_channels: int,
+        out_channels: int,
+        kernel_width: int,
+        dropout: float = 0.1,
+    ) -> None:
+        super().__init__()
+        assert kernel_width % 2 == 1, "kernel_width must be odd to preserve length"
+
+        self.conv_block = nn.Sequential(
+            nn.Conv1d(
+                in_channels=in_channels,
+                out_channels=out_channels,
+                kernel_size=kernel_width,
+                padding=kernel_width // 2,
+                bias=False,
+            ),
+            nn.BatchNorm1d(out_channels),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Conv1d(
+                in_channels=out_channels,
+                out_channels=out_channels,
+                kernel_size=kernel_width,
+                padding=kernel_width // 2,
+                bias=False,
+            ),
+            nn.BatchNorm1d(out_channels),
+        )
+
+        self.shortcut = (
+            nn.Identity()
+            if in_channels == out_channels
+            else nn.Conv1d(in_channels, out_channels, kernel_size=1, bias=False)
+        )
+        self.relu = nn.ReLU()
+
+    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
+        # inputs: (T, N, C)
+        x = inputs.movedim(0, -1)  # (N, C, T)
+        residual = self.shortcut(x)
+        x = self.conv_block(x)
+        x = self.relu(x + residual)
+        return x.movedim(-1, 0)  # (T, N, C)
+
+
+class CNNEncoder(nn.Module):
+    """Temporal CNN encoder for inputs of shape (T, N, num_features).
+
+    Stacks several residual 1D conv blocks along time and returns
+    (T, N, conv_channels[-1]).
+    """
+
+    def __init__(
+        self,
+        in_features: int,
+        conv_channels: Sequence[int] = (128, 128, 128),
+        kernel_widths: Sequence[int] = (5, 5, 5),
+        dropout: float = 0.1,
+    ) -> None:
+        super().__init__()
+        assert len(conv_channels) > 0, "conv_channels must be non-empty"
+
+        if len(kernel_widths) == 1 and len(conv_channels) > 1:
+            kernel_widths = tuple(kernel_widths) * len(conv_channels)
+
+        assert len(conv_channels) == len(
+            kernel_widths
+        ), "conv_channels and kernel_widths must have the same length"
+
+        blocks: list[nn.Module] = []
+        current_channels = in_features
+        for out_channels, kernel_width in zip(conv_channels, kernel_widths):
+            blocks.append(
+                TemporalConvBlock(
+                    in_channels=current_channels,
+                    out_channels=out_channels,
+                    kernel_width=kernel_width,
+                    dropout=dropout,
+                )
+            )
+            current_channels = out_channels
+
+        self.blocks = nn.Sequential(*blocks)
+        self.out_features = current_channels
+
+    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
+        return self.blocks(inputs)  # (T, N, out_features)
