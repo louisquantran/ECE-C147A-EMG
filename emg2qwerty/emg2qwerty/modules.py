@@ -286,40 +286,59 @@ from torch.nn.utils import weight_norm
 class TCNBlock(nn.Module):
     def __init__(self, in_ch, out_ch, kernel_size, dilation, dropout):
         super().__init__()
+
         padding = (kernel_size - 1) * dilation
-        
-        # Standard TCNs use two convolutions per residual block
-        self.conv = weight_norm(nn.Conv1d(in_ch, out_ch, kernel_size, 
-                                         dilation=dilation, padding=0))
-        self.pad = nn.ConstantPad1d((padding, 0), 0)
+
+        self.pad1 = nn.ConstantPad1d((padding, 0), 0)
+        self.conv1 = weight_norm(nn.Conv1d(in_ch, out_ch, kernel_size, dilation=dilation))
+        self.bn1 = nn.BatchNorm1d(out_ch)
+
+        self.pad2 = nn.ConstantPad1d((padding, 0), 0)
+        self.conv2 = weight_norm(nn.Conv1d(out_ch, out_ch, kernel_size, dilation=dilation))
+        self.bn2 = nn.BatchNorm1d(out_ch)
+
         self.relu = nn.ReLU()
         self.dropout = nn.Dropout(dropout)
-        
-        # Residual connection: if in/out channels differ, use a 1x1 conv to match
+
         self.res_match = nn.Conv1d(in_ch, out_ch, 1) if in_ch != out_ch else nn.Identity()
 
     def forward(self, x):
         res = self.res_match(x)
-        out = self.pad(x)
-        out = self.conv(out)
+
+        out = self.pad1(x)
+        out = self.conv1(out)
+        out = self.bn1(out)
         out = self.relu(out)
         out = self.dropout(out)
-        return self.relu(out + res) # The "Skip Connection"
+
+        out = self.pad2(out)
+        out = self.conv2(out)
+        out = self.bn2(out)
+        out = self.relu(out)
+        out = self.dropout(out)
+
+        return self.relu(out + res)
 
 class TCNEncoder(nn.Module):
     def __init__(self, num_features, num_channels, kernel_size=3, dropout=0.2):
         super().__init__()
+
         layers = []
         for i in range(len(num_channels)):
             dilation = 2 ** i
             in_ch = num_features if i == 0 else num_channels[i-1]
-            layers.append(TCNBlock(in_ch, num_channels[i], kernel_size, dilation, dropout))
-        
+
+            layers.append(
+                TCNBlock(in_ch, num_channels[i], kernel_size, dilation, dropout)
+            )
+
         self.network = nn.Sequential(*layers)
+        self.norm = nn.LayerNorm(num_channels[-1])
         self.final_proj = nn.Linear(num_channels[-1], num_features)
 
     def forward(self, x):
-        x = x.permute(1, 2, 0) # (N, C, T)
+        x = x.permute(1,2,0)     # (N,C,T)
         x = self.network(x)
-        x = x.permute(2, 0, 1) # (T, N, C)
+        x = x.permute(2,0,1)     # (T,N,C)
+        x = self.norm(x)
         return self.final_proj(x)

@@ -275,37 +275,43 @@ class TDSConvCTCModule(pl.LightningModule):
 
 class TCNCTCModule(TDSConvCTCModule):
     def __init__(
-        self, 
-        *args, 
-        num_channels: Sequence[int], 
-        kernel_size: int, 
-        dropout: float, 
+        self,
+        *args,
+        num_channels: Sequence[int],
+        kernel_size: int,
+        dropout: float,
         **kwargs
     ) -> None:
-        # 1. Use .get() with defaults to avoid KeyError. 
-        # This handles cases where Hydra might nest these keys.
-        self.custom_lr = kwargs.get('lr', 0.002) 
-        self.custom_weight_decay = kwargs.get('weight_decay', 1e-4)
-        
-        # 2. Filter kwargs to prevent passing 'lr' and 'weight_decay' to the parent
-        # since we know TDSConvCTCModule doesn't want them.
-        parent_kwargs = {k: v for k, v in kwargs.items() if k not in ['lr', 'weight_decay']}
-        
+        print("TCN MODEL INITIALIZED")
+
+        # Save ALL hyperparameters for checkpoint reload
+        self.save_hyperparameters()
+
+        # Extract optional optimizer params
+        self.custom_lr = kwargs.get("lr", 0.001)
+        self.custom_weight_decay = kwargs.get("weight_decay", 1e-4)
+
+        # Sanitize kwargs to prevent the PyTorch Lightning checkpoint crash.
+        # We explicitly remove 'block_channels' and 'kernel_width' so they 
+        # aren't passed twice to the parent class during checkpoint loading.
+        parent_kwargs = {
+            k: v for k, v in kwargs.items()
+            if k not in ["lr", "weight_decay", "block_channels", "kernel_width"]
+        }
+
         super().__init__(
-            *args, 
-            block_channels=num_channels, 
-            kernel_width=kernel_size, 
+            *args,
+            block_channels=num_channels,
+            kernel_width=kernel_size,
             **parent_kwargs
         )
-        
-        # 3. Save ALL hyperparams to ensure the final Results Chart generates
-        self.save_hyperparameters("num_channels", "kernel_size", "dropout", "lr", "weight_decay")
-        
-        # 4. Initialize the 128-channel encoder
+
+        # Replace encoder with TCN
         num_features = self.NUM_BANDS * self.hparams.mlp_features[-1]
+
         self.model[3] = TCNEncoder(
             num_features=num_features,
             num_channels=num_channels,
             kernel_size=kernel_size,
-            dropout=dropout
+            dropout=dropout,
         )
