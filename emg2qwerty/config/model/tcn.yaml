@@ -3,7 +3,7 @@ module:
   _target_: emg2qwerty.lightning.TCNCTCModule
   in_features: 528
   mlp_features: [384]
-  num_channels: [192, 256, 256, 384]
+  num_channels: [192, 256, 256, 256, 256, 384]
   kernel_size: 9
   dropout: 0.25
 
