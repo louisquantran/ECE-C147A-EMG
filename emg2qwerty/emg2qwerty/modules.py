@@ -282,7 +282,7 @@ class TDSConvEncoder(nn.Module):
 class TemporalConvBlock(nn.Module):
     """Residual 1D temporal convolution block for inputs of shape (T, N, C).
 
-    Uses same-padding (odd kernel widths) so the temporal length is preserved.
+    Uses same-padding with dilation so the temporal length is preserved.
     """
 
     def __init__(
@@ -290,17 +290,21 @@ class TemporalConvBlock(nn.Module):
         in_channels: int,
         out_channels: int,
         kernel_width: int,
+        dilation: int = 1,
         dropout: float = 0.1,
     ) -> None:
         super().__init__()
         assert kernel_width % 2 == 1, "kernel_width must be odd to preserve length"
+
+        padding = dilation * (kernel_width // 2)
 
         self.conv_block = nn.Sequential(
             nn.Conv1d(
                 in_channels=in_channels,
                 out_channels=out_channels,
                 kernel_size=kernel_width,
-                padding=kernel_width // 2,
+                padding=padding,
+                dilation=dilation,
                 bias=False,
             ),
             nn.BatchNorm1d(out_channels),
@@ -310,7 +314,8 @@ class TemporalConvBlock(nn.Module):
                 in_channels=out_channels,
                 out_channels=out_channels,
                 kernel_size=kernel_width,
-                padding=kernel_width // 2,
+                padding=padding,
+                dilation=dilation,
                 bias=False,
             ),
             nn.BatchNorm1d(out_channels),
@@ -335,15 +340,16 @@ class TemporalConvBlock(nn.Module):
 class CNNEncoder(nn.Module):
     """Temporal CNN encoder for inputs of shape (T, N, num_features).
 
-    Stacks several residual 1D conv blocks along time and returns
+    Stacks several residual 1D dilated conv blocks along time and returns
     (T, N, conv_channels[-1]).
     """
 
     def __init__(
         self,
         in_features: int,
-        conv_channels: Sequence[int] = (128, 128, 128),
-        kernel_widths: Sequence[int] = (5, 5, 5),
+        conv_channels: Sequence[int] = (192, 192, 192, 192, 192),
+        kernel_widths: Sequence[int] = (9, 9, 9, 9, 9),
+        dilations: Sequence[int] = (1, 2, 4, 8, 16),
         dropout: float = 0.1,
     ) -> None:
         super().__init__()
@@ -352,18 +358,27 @@ class CNNEncoder(nn.Module):
         if len(kernel_widths) == 1 and len(conv_channels) > 1:
             kernel_widths = tuple(kernel_widths) * len(conv_channels)
 
-        assert len(conv_channels) == len(
-            kernel_widths
-        ), "conv_channels and kernel_widths must have the same length"
+        if len(dilations) == 1 and len(conv_channels) > 1:
+            dilations = tuple(dilations) * len(conv_channels)
+
+        assert len(conv_channels) == len(kernel_widths), (
+            "conv_channels and kernel_widths must have the same length"
+        )
+        assert len(conv_channels) == len(dilations), (
+            "conv_channels and dilations must have the same length"
+        )
 
         blocks: list[nn.Module] = []
         current_channels = in_features
-        for out_channels, kernel_width in zip(conv_channels, kernel_widths):
+        for out_channels, kernel_width, dilation in zip(
+            conv_channels, kernel_widths, dilations
+        ):
             blocks.append(
                 TemporalConvBlock(
                     in_channels=current_channels,
                     out_channels=out_channels,
                     kernel_width=kernel_width,
+                    dilation=dilation,
                     dropout=dropout,
                 )
             )
