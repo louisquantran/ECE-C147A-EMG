@@ -281,6 +281,7 @@ class CNNCTCModule(pl.LightningModule):
         mlp_features: Sequence[int],
         conv_channels: Sequence[int],
         kernel_widths: Sequence[int],
+        dilations: Sequence[int],
         dropout: float,
         optimizer: DictConfig,
         lr_scheduler: DictConfig,
@@ -295,6 +296,7 @@ class CNNCTCModule(pl.LightningModule):
             in_features=num_features,
             conv_channels=conv_channels,
             kernel_widths=kernel_widths,
+            dilations=dilations,
             dropout=dropout,
         )
 
@@ -311,7 +313,10 @@ class CNNCTCModule(pl.LightningModule):
             nn.LogSoftmax(dim=-1),
         )
 
-        self.ctc_loss = nn.CTCLoss(blank=charset().null_class)
+        self.ctc_loss = nn.CTCLoss(
+            blank=charset().null_class,
+            zero_infinity=True,
+        )
         self.decoder = instantiate(decoder)
 
         metrics = MetricCollection([CharacterErrorRates()])
