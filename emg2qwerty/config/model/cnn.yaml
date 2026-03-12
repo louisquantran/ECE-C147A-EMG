@@ -1,13 +1,14 @@
 # @package _global_
 module:
   _target_: emg2qwerty.lightning.CNNCTCModule
-  in_features: 528  # freq * channels = (n_fft // 2 + 1) * 16
+  in_features: 528
   mlp_features: [384]
-  conv_channels: [128, 128, 128]
-  kernel_widths: [5, 5, 5]
-  dropout: 0.1
+  conv_channels: [192, 192, 192, 192, 192]
+  kernel_widths: [9, 9, 9, 9, 9]
+  dilations: [1, 2, 4, 8, 16]
+  dropout: 0.15
 
 datamodule:
   _target_: emg2qwerty.lightning.WindowedEMGDataModule
-  window_length: 8000  # 4 sec windows for 2kHz EMG
-  padding: [1800, 200]  # 900ms past context, 100ms future context
+  window_length: 8000
+  padding: [1800, 200]
