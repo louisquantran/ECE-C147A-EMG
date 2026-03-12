@@ -10,6 +10,7 @@ from typing import Any, TypeVar
 
 import numpy as np
 import torch
+import torch.nn as nn
 import torchaudio
 
 
@@ -243,3 +244,57 @@ class SpecAugment:
 
         # (..., C, freq, T) -> (T, ..., C, freq)
         return x.movedim(-1, 0)
+
+class Standardize(nn.Module):
+    def __init__(self, eps: float = 1e-5, per_channel: bool = True) -> None:
+        super().__init__()
+        self.eps = eps
+        self.per_channel = per_channel
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Standardize raw EMG.
+
+        Expected input shape:
+          - (T, C) for raw EMG time x channels
+        Returns:
+          - standardized tensor with same shape
+        """
+        if self.per_channel:
+            # mean/std over time for each channel
+            mean = x.mean(dim=0, keepdim=True)
+            std = x.std(dim=0, keepdim=True)
+        else:
+            mean = x.mean()
+            std = x.std()
+
+        return (x - mean) / (std + self.eps)
+
+class ClipAmplitude(nn.Module):
+    def __init__(self, min_value: float = -5.0, max_value: float = 5.0) -> None:
+        super().__init__()
+        self.min_value = min_value
+        self.max_value = max_value
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        x shape for raw EMG: (T, C)
+        """
+        return torch.clamp(x, min=self.min_value, max=self.max_value)
+    
+class AddGaussianNoise(nn.Module):
+    def __init__(self, std: float = 0.01, p: float = 1.0) -> None:
+        super().__init__()
+        self.std = std
+        self.p = p
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        x shape for raw EMG: (T, C)
+        Adds Gaussian noise only during training-time augmentation pipeline.
+        """
+        if torch.rand(1).item() > self.p:
+            return x
+
+        noise = torch.randn_like(x) * self.std
+        return x + noise

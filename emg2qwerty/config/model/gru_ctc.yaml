@@ -3,10 +3,8 @@ module:
   _target_: emg2qwerty.lightning.GRUCTCModule
   in_features: 528
   mlp_features: [384]
-  hidden_size: 384
-  num_layers: 3
-  bidirectional: true
-  gru_dropout: 0.1
+  hidden_size: 256
+  num_layers: 5
 
 datamodule:
   _target_: emg2qwerty.lightning.WindowedEMGDataModule

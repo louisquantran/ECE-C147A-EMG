@@ -313,6 +313,30 @@ class GRUEncoder(nn.Module):
         outputs, _ = self.gru(inputs)
         return outputs
     
+class TDSGRUEncoder(nn.Module):
+    def __init__(
+        self, 
+        num_features: int, 
+        rnn_hidden_size: int = 128, 
+        num_rnn_layers: int = 5
+    ) -> None:
+        super().__init__()
+        self.rnn = nn.GRU(
+            input_size=num_features, 
+            hidden_size=rnn_hidden_size, 
+            num_layers=num_rnn_layers, 
+            batch_first=False, 
+            bidirectional=True
+        )
+
+        self.fc_block = TDSFullyConnectedBlock(rnn_hidden_size * 2)
+        self.out_layer = nn.Linear(rnn_hidden_size * 2, num_features)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x, _ = self.rnn(x)
+        x = self.out_layer(self.fc_block(x))
+        return x
+    
 class TemporalConv1D(nn.Module):
     """Temporal conv stack for inputs of shape (T, N, C)."""
 

@@ -22,9 +22,11 @@ from emg2qwerty.charset import charset
 from emg2qwerty.data import LabelData, WindowedEMGDataset
 from emg2qwerty.metrics import CharacterErrorRates
 from emg2qwerty.modules import (
+    TDSGRUEncoder,
     MultiBandRotationInvariantMLP,
     SpectrogramNorm,
     TDSConvEncoder,
+    TemporalConv1D,
 )
 from emg2qwerty.transforms import Transform
 
@@ -280,8 +282,6 @@ class GRUCTCModule(pl.LightningModule):
         mlp_features: Sequence[int],
         hidden_size: int,
         num_layers: int,
-        bidirectional: bool,
-        gru_dropout: float,
         optimizer: DictConfig,
         lr_scheduler: DictConfig,
         decoder: DictConfig,
@@ -291,16 +291,12 @@ class GRUCTCModule(pl.LightningModule):
 
         num_features = self.NUM_BANDS * mlp_features[-1]
 
-        self.encoder = GRUEncoder(
+        self.encoder = TDSGRUEncoder(
             num_features=num_features,
-            hidden_size=hidden_size,
-            num_layers=num_layers,
-            bidirectional=bidirectional,
-            dropout=gru_dropout,
+            rnn_hidden_size=hidden_size,
+            num_rnn_layers=num_layers,
         )
 
-        # Model
-        # inputs: (T, N, bands=2, electrode_channels=16, freq)
         self.model = nn.Sequential(
             SpectrogramNorm(channels=self.NUM_BANDS * self.ELECTRODE_CHANNELS),
             MultiBandRotationInvariantMLP(
@@ -308,19 +304,15 @@ class GRUCTCModule(pl.LightningModule):
                 mlp_features=mlp_features,
                 num_bands=self.NUM_BANDS,
             ),
-            nn.Flatten(start_dim=2),  # (T, N, num_features)
-            self.encoder,             # (T, N, encoder.output_features)
-            nn.Linear(self.encoder.output_features, charset().num_classes),
+            nn.Flatten(start_dim=2),
+            self.encoder,
+            nn.Linear(num_features, charset().num_classes),
             nn.LogSoftmax(dim=-1),
         )
 
-        # Criterion
         self.ctc_loss = nn.CTCLoss(blank=charset().null_class)
-
-        # Decoder
         self.decoder = instantiate(decoder)
 
-        # Metrics
         metrics = MetricCollection([CharacterErrorRates()])
         self.metrics = nn.ModuleDict(
             {
@@ -342,15 +334,13 @@ class GRUCTCModule(pl.LightningModule):
         N = len(input_lengths)
 
         emissions = self.forward(inputs)
-
-        # GRU does NOT shrink time dimension
         emission_lengths = input_lengths
 
         loss = self.ctc_loss(
-            log_probs=emissions,                 # (T, N, num_classes)
-            targets=targets.transpose(0, 1),    # (T, N) -> (N, T)
-            input_lengths=emission_lengths,     # (N,)
-            target_lengths=target_lengths,      # (N,)
+            log_probs=emissions,
+            targets=targets.transpose(0, 1),
+            input_lengths=emission_lengths,
+            target_lengths=target_lengths,
         )
 
         predictions = self.decoder.decode_batch(
@@ -359,10 +349,11 @@ class GRUCTCModule(pl.LightningModule):
         )
 
         metrics = self.metrics[f"{phase}_metrics"]
-        targets = targets.detach().cpu().numpy()
-        target_lengths = target_lengths.detach().cpu().numpy()
+        targets_np = targets.detach().cpu().numpy()
+        target_lengths_np = target_lengths.detach().cpu().numpy()
+
         for i in range(N):
-            target = LabelData.from_labels(targets[: target_lengths[i], i])
+            target = LabelData.from_labels(targets_np[: target_lengths_np[i], i])
             metrics.update(prediction=predictions[i], target=target)
 
         self.log(f"{phase}/loss", loss, batch_size=N, sync_dist=True)
