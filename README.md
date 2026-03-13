@@ -10,14 +10,15 @@
 conda activate emg2qwerty
 ```
 
-3. As we experimented everything on 50 epochs, the baseline (default) performance can be tested by running:
+3. As we experimented everything on 50 epochs, every architecture was trained by running:
 
 ```bash
-python -m emg2qwerty.train --multirun \
-  user=single_user \
-  trainer.devices=1 \
-  trainer.accelerator=gpu \
-  trainer.max_epochs=50
+python -m emg2qwerty.train --multirun model=<yaml file> user=single_user trainer.accelerator=gpu trainer.devices=1 trainer.max_epochs=50
+```
+
+4. To obtain the test CER, the following command was used:
+```bash
+python -m emg2qwerty.train model=gru_ctc user=single_user 'checkpoint="<checkpoint path>"' train=False trainer.accelerator=gpu trainer.devices=1
 ```
 
 ## LSTM Architecture
