@@ -282,6 +282,11 @@ class GRUCTCModule(pl.LightningModule):
         mlp_features: Sequence[int],
         hidden_size: int,
         num_layers: int,
+
+        # ===== Original GRU-only args (commented-out implementation) =====
+        # bidirectional: bool,
+        # gru_dropout: float,
+
         optimizer: DictConfig,
         lr_scheduler: DictConfig,
         decoder: DictConfig,
@@ -291,12 +296,45 @@ class GRUCTCModule(pl.LightningModule):
 
         num_features = self.NUM_BANDS * mlp_features[-1]
 
+        # ------------------------------------------------------------------
+        # Original GRUEncoder implementation
+        # ------------------------------------------------------------------
+        # self.encoder = GRUEncoder(
+        #     num_features=num_features,
+        #     hidden_size=hidden_size,
+        #     num_layers=num_layers,
+        #     bidirectional=bidirectional,
+        #     dropout=gru_dropout,
+        # )
+
+        # ------------------------------------------------------------------
+        # Active TDSGRUEncoder implementation
+        # ------------------------------------------------------------------
         self.encoder = TDSGRUEncoder(
             num_features=num_features,
             rnn_hidden_size=hidden_size,
             num_rnn_layers=num_layers,
         )
 
+        # ------------------------------------------------------------------
+        # Original GRU-only model
+        # ------------------------------------------------------------------
+        # self.model = nn.Sequential(
+        #     SpectrogramNorm(channels=self.NUM_BANDS * self.ELECTRODE_CHANNELS),
+        #     MultiBandRotationInvariantMLP(
+        #         in_features=in_features,
+        #         mlp_features=mlp_features,
+        #         num_bands=self.NUM_BANDS,
+        #     ),
+        #     nn.Flatten(start_dim=2),  # (T, N, num_features)
+        #     self.encoder,             # (T, N, encoder.output_features)
+        #     nn.Linear(self.encoder.output_features, charset().num_classes),
+        #     nn.LogSoftmax(dim=-1),
+        # )
+
+        # ------------------------------------------------------------------
+        # Active TDSGRU model
+        # ------------------------------------------------------------------
         self.model = nn.Sequential(
             SpectrogramNorm(channels=self.NUM_BANDS * self.ELECTRODE_CHANNELS),
             MultiBandRotationInvariantMLP(
@@ -310,9 +348,13 @@ class GRUCTCModule(pl.LightningModule):
             nn.LogSoftmax(dim=-1),
         )
 
+        # Criterion
         self.ctc_loss = nn.CTCLoss(blank=charset().null_class)
+
+        # Decoder
         self.decoder = instantiate(decoder)
 
+        # Metrics
         metrics = MetricCollection([CharacterErrorRates()])
         self.metrics = nn.ModuleDict(
             {
@@ -334,11 +376,14 @@ class GRUCTCModule(pl.LightningModule):
         N = len(input_lengths)
 
         emissions = self.forward(inputs)
+
+        # Original comment:
+        # GRU does NOT shrink time dimension
         emission_lengths = input_lengths
 
         loss = self.ctc_loss(
-            log_probs=emissions,
-            targets=targets.transpose(0, 1),
+            log_probs=emissions,              # (T, N, num_classes)
+            targets=targets.transpose(0, 1), # (T, N) -> (N, T)
             input_lengths=emission_lengths,
             target_lengths=target_lengths,
         )
