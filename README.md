@@ -2,13 +2,7 @@
 
 ## Initial Setup
 
-1. Download the data for the single user:
-
-```bash
-Command here
-```
-
-Make sure the data for the single user is stored at ```ECE-C147A-EMG/emg2qwerty/data/```
+1. Download the data for the single user and make sure the data for the single user is stored at: ```ECE-C147A-EMG/emg2qwerty/data/```
 
 2. Activate conda
 
@@ -36,7 +30,9 @@ To reproduce the TCN architecture experiments:
 
 1. Switch to the TCN branch:
 
+```bash
 git checkout feature/standard-tcn
+```
 
 2. Run the training command:
 
@@ -63,7 +59,9 @@ To reproduce the data ablation experiments:
 
 1. Make sure you are in the right branch:
 
+```bash
 git checkout gru_cnn
+```
 
 2. Example command for running the GRU model with a subset of 4 sessions:
 
@@ -77,10 +75,10 @@ python -m emg2qwerty.train --multirun \
   trainer.max_epochs=50
 ```
 
-Replace the number 4 with 8 or 12 to test the model with a subset of 8/12 sessions.
+   Replace the number 4 with 8 or 12 to test the model with a subset of 8/12 sessions.
 
 3. To run the GRU model with the default (all sessions) just run the default training command with no ```+ablation=...``` parameter
 
-log.out for each run are stored in: ```gru_data_ablation/```
+log.out for each run are stored in: ```gru_data_ablations/```
 
 ## Sampling Rate
