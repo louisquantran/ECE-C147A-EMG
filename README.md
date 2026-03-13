@@ -37,6 +37,6 @@ A stronger hybrid architecture that combines a GRU-based recurrent encoder with 
 
 The implementations for these models can be found in:
 
-- `/emg2qwerty/config/model/*.yaml` — model configuration files and hyperparameters
-- `/emg2qwerty/lightning.py` — PyTorch Lightning model definitions and training logic
-- `/emg2qwerty/modules.py` — architecture components and encoder modules
+- `/emg2qwerty/config/model/*.yaml` - model configuration files and hyperparameters
+- `/emg2qwerty/lightning.py` - PyTorch Lightning model definitions and training logic
+- `/emg2qwerty/modules.py` - architecture components and encoder modules
