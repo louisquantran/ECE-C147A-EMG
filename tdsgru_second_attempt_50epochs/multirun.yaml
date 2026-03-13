@@ -261,13 +261,10 @@ transforms:
   - ${to_tensor}
   - ${band_rotation}
   - ${temporal_jitter}
-  - ${standardize}
-  - ${add_gaussian_noise}
   - ${logspec}
   - ${specaug}
   val:
   - ${to_tensor}
-  - ${standardize}
   - ${logspec}
   test: ${transforms.val}
 module:
@@ -276,7 +273,7 @@ module:
   mlp_features:
   - 384
   hidden_size: 256
-  num_layers: 5
+  num_layers: 2
 datamodule:
   _target_: emg2qwerty.lightning.WindowedEMGDataModule
   window_length: 8000
