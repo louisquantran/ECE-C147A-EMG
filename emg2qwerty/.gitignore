@@ -1,6 +1,8 @@
 # Swap files
 *.sw*
 
+*.ckpt
+
 # Backup files
 *~
 
@@ -43,7 +45,6 @@ dmypy.json
 .hypothesis
 
 # Logs and checkpoints
-logs/
 lightning_logs/
 
 # Data
