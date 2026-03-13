@@ -32,9 +32,21 @@ Switch to the TCN branch where there will be further instructions in the README 
 git checkout feature/standard-tcn
 ```
 
-## GRU, CNN + GRU, TDSGRU Architectures
+## GRU, CNN + GRU Hybrid, TDSGRU Architectures
+
+Switch to the GRU, CNN + GRU Hybrid, TDSGRU branch where there will be further instructions in the README of that branch.
+
+```bash
+git checkout gru_cnn
+```
 
 ## Data Preprocessing and Augmentation
+
+Switch to the data preprocessing and augmentation branch where there will be further instructions in the README of that branch.
+
+```bash
+git checkout prepro_augment
+```
 
 ## Channel Ablation
 
