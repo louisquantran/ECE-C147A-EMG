@@ -5,6 +5,8 @@ module:
   mlp_features: [384]
   hidden_size: 256
   num_layers: 5
+  # For GRU:
+  # gru_dropout: float,
 
 datamodule:
   _target_: emg2qwerty.lightning.WindowedEMGDataModule
