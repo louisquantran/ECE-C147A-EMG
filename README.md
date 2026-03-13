@@ -26,26 +26,11 @@ python -m emg2qwerty.train --multirun \
 
 ## TCN Architecture
 
-To reproduce the TCN architecture experiments:
-
-1. Switch to the TCN branch:
+Switch to the TCN branch where there will be further instructions in the README of that branch.
 
 ```bash
 git checkout feature/standard-tcn
 ```
-
-2. Run the training command:
-
-```bash
-python -m emg2qwerty.train --multirun \
-  user=single_user \
-  model=tcn \
-  trainer.devices=1 \
-  trainer.accelerator=gpu \
-  trainer.max_epochs=50
-```
-
-3. log.out and some log.err have been committed to the repo and they will be found at: ```results-philemon/```
 
 ## GRU, CNN + GRU, TDSGRU Architectures
 
@@ -55,7 +40,7 @@ python -m emg2qwerty.train --multirun \
 
 ## Data Ablation
 
-Switch to the Data Ablation branch where there will be further instructions.
+Switch to the Data Ablation branch where there will be further instructions in the README of that branch.
 
 ```bash
 git checkout data_ablation
