@@ -1,4 +1,3 @@
-
 # ECE-C147A-EMG (GRU, GRU+CNN hybrid, TDSGRU Model Experiments)
 
 This repository contains our portion of the UCLA ECE C147A final project based on the **emg2qwerty** task: decoding QWERTY typing from surface EMG (sEMG) signals.
@@ -33,3 +32,11 @@ A hybrid architecture that combines convolutional layers for local temporal feat
 
 ### 3. TDSGRU
 A stronger hybrid architecture that combines a GRU-based recurrent encoder with a TDS-style fully connected refinement block before classification.
+
+## Implementation Locations
+
+The implementations for these models can be found in:
+
+- `/emg2qwerty/config/model/*.yaml` — model configuration files and hyperparameters
+- `/emg2qwerty/lightning.py` — PyTorch Lightning model definitions and training logic
+- `/emg2qwerty/modules.py` — architecture components and encoder modules
