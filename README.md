@@ -19,9 +19,7 @@ python -m emg2qwerty.train --multirun \
   trainer.max_epochs=50
 ```
 
-3. log.out and some log.err have been committed to the repo and they will be found at:
-
-results-philemon/
+3. log.out and some log.err have been committed to the repo and they will be found at: ```bash results-philemon/ ```
 
 ## Data Ablation
 
@@ -33,6 +31,7 @@ git checkout gru_cnn
 
 2. Example command for running the GRU model with a subset of 4 sessions:
 
+```bash
 python -m emg2qwerty.train --multirun \
   model=gru_ctc \
   user=single_user \
@@ -40,11 +39,10 @@ python -m emg2qwerty.train --multirun \
   trainer.devices=1 \
   trainer.accelerator=gpu \
   trainer.max_epochs=50
+```
 
 Replace the number 4 with 8 or 12 to test the model with a subset of 8/12 sessions.
 
-3. To run the GRU model with the default (all sessions) just run the default training command with no +ablation=...
+3. To run the GRU model with the default (all sessions) just run the default training command with no ```bash +ablation=... ``` parameter
 
-log.out for each run are stored in:
-
-gru_data_ablation/
+log.out for each run are stored in: ```bash gru_data_ablation/ ```
