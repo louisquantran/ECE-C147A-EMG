@@ -26,4 +26,12 @@ python -m emg2qwerty.train --multirun \
 
 3. To run the GRU model with the default (all sessions) just run the default training command with no ```+ablation=...``` parameter
 
-log.out for each run are stored in: ```gru_data_ablations/```
+4. log.out for each run are stored in: ```gru_data_ablations/```
+
+## Files Created
+
+The implementation for the data ablation can be found in:
+
+- `/emg2qwerty/config/ablation/4_sessions.yaml` - Dataset of the first 4 sessions
+- `/emg2qwerty/config/ablation/8_sessions.yaml` - Dataset of the first 8 sessions
+- `/emg2qwerty/config/ablation/12_sessions.yaml` - Dataset of the first 12 sessions
