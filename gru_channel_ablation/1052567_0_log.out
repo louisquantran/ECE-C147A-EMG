@@ -1,0 +1,182 @@
+submitit INFO (2026-03-13 08:56:45,747) - Starting with JobEnvironment(job_id=1052567, hostname=abc, local_rank=0(1), node=0(1), global_rank=0(1))
+submitit INFO (2026-03-13 08:56:45,748) - Loading pickle: /home/linnthit/ECE-C147A-EMG/emg2qwerty/logs/2026-03-13/08-56-44/submitit_logs/1052567/1052567_submitted.pkl
+[2026-03-13 08:56:49,114][__main__][INFO] - 
+Config:
+user: single_user
+dataset:
+  train:
+  - user: 89335547
+    session: 2021-06-03-1622765527-keystrokes-dca-study@1-0efbe614-9ae6-4131-9192-4398359b4f5f
+  - user: 89335547
+    session: 2021-06-02-1622681518-keystrokes-dca-study@1-0efbe614-9ae6-4131-9192-4398359b4f5f
+  - user: 89335547
+    session: 2021-06-04-1622863166-keystrokes-dca-study@1-0efbe614-9ae6-4131-9192-4398359b4f5f
+  - user: 89335547
+    session: 2021-07-22-1627003020-keystrokes-dca-study@1-0efbe614-9ae6-4131-9192-4398359b4f5f
+  - user: 89335547
+    session: 2021-07-21-1626916256-keystrokes-dca-study@1-0efbe614-9ae6-4131-9192-4398359b4f5f
+  - user: 89335547
+    session: 2021-07-22-1627004019-keystrokes-dca-study@1-0efbe614-9ae6-4131-9192-4398359b4f5f
+  - user: 89335547
+    session: 2021-06-05-1622885888-keystrokes-dca-study@1-0efbe614-9ae6-4131-9192-4398359b4f5f
+  - user: 89335547
+    session: 2021-06-02-1622679967-keystrokes-dca-study@1-0efbe614-9ae6-4131-9192-4398359b4f5f
+  - user: 89335547
+    session: 2021-06-03-1622764398-keystrokes-dca-study@1-0efbe614-9ae6-4131-9192-4398359b4f5f
+  - user: 89335547
+    session: 2021-07-21-1626917264-keystrokes-dca-study@1-0efbe614-9ae6-4131-9192-4398359b4f5f
+  - user: 89335547
+    session: 2021-06-05-1622889105-keystrokes-dca-study@1-0efbe614-9ae6-4131-9192-4398359b4f5f
+  - user: 89335547
+    session: 2021-06-03-1622766673-keystrokes-dca-study@1-0efbe614-9ae6-4131-9192-4398359b4f5f
+  - user: 89335547
+    session: 2021-06-04-1622861066-keystrokes-dca-study@1-0efbe614-9ae6-4131-9192-4398359b4f5f
+  - user: 89335547
+    session: 2021-07-22-1627001995-keystrokes-dca-study@1-0efbe614-9ae6-4131-9192-4398359b4f5f
+  - user: 89335547
+    session: 2021-06-05-1622884635-keystrokes-dca-study@1-0efbe614-9ae6-4131-9192-4398359b4f5f
+  - user: 89335547
+    session: 2021-07-21-1626915176-keystrokes-dca-study@1-0efbe614-9ae6-4131-9192-4398359b4f5f
+  val:
+  - user: 89335547
+    session: 2021-06-04-1622862148-keystrokes-dca-study@1-0efbe614-9ae6-4131-9192-4398359b4f5f
+  test:
+  - user: 89335547
+    session: 2021-06-02-1622682789-keystrokes-dca-study@1-0efbe614-9ae6-4131-9192-4398359b4f5f
+  root: ${hydra:runtime.cwd}/data
+to_tensor:
+  _target_: emg2qwerty.transforms.ToTensor
+  fields:
+  - emg_left
+  - emg_right
+band_rotation:
+  _target_: emg2qwerty.transforms.ForEach
+  transform:
+    _target_: emg2qwerty.transforms.RandomBandRotation
+    offsets:
+    - -1
+    - 0
+    - 1
+temporal_jitter:
+  _target_: emg2qwerty.transforms.TemporalAlignmentJitter
+  max_offset: 120
+standardize:
+  _target_: emg2qwerty.transforms.Standardize
+  eps: 1.0e-05
+  per_channel: true
+clip_amplitude:
+  _target_: emg2qwerty.transforms.ClipAmplitude
+  min_value: -5.0
+  max_value: 5.0
+add_gaussian_noise:
+  _target_: emg2qwerty.transforms.AddGaussianNoise
+  std: 0.01
+  p: 1.0
+logspec:
+  _target_: emg2qwerty.transforms.LogSpectrogram
+  n_fft: 64
+  hop_length: 16
+specaug:
+  _target_: emg2qwerty.transforms.SpecAugment
+  n_time_masks: 3
+  time_mask_param: 25
+  n_freq_masks: 2
+  freq_mask_param: 4
+transforms:
+  train:
+  - ${to_tensor}
+  - ${band_rotation}
+  - ${temporal_jitter}
+  - ${logspec}
+  - ${specaug}
+  val:
+  - ${to_tensor}
+  - ${logspec}
+  test: ${transforms.val}
+module:
+  _target_: emg2qwerty.lightning.GRUCTCModule
+  in_features: 528
+  mlp_features:
+  - 384
+  hidden_size: 256
+  num_layers: 5
+  keep_channels_per_band: 4
+datamodule:
+  _target_: emg2qwerty.lightning.WindowedEMGDataModule
+  window_length: 8000
+  padding:
+  - 1800
+  - 200
+optimizer:
+  _target_: torch.optim.Adam
+  lr: 0.001
+lr_scheduler:
+  scheduler:
+    _target_: pl_bolts.optimizers.lr_scheduler.LinearWarmupCosineAnnealingLR
+    warmup_epochs: 10
+    max_epochs: ${trainer.max_epochs}
+    warmup_start_lr: 1.0e-08
+    eta_min: 1.0e-06
+  interval: epoch
+decoder:
+  _target_: emg2qwerty.decoder.CTCGreedyDecoder
+seed: 1501
+batch_size: 32
+num_workers: 2
+train: false
+checkpoint: best_gru_test.ckpt
+monitor_metric: val/CER
+monitor_mode: min
+trainer:
+  accelerator: gpu
+  devices: 1
+  num_nodes: 1
+  max_epochs: 150
+  default_root_dir: ${hydra:runtime.output_dir}
+callbacks:
+- _target_: pytorch_lightning.callbacks.LearningRateMonitor
+- _target_: pytorch_lightning.callbacks.ModelCheckpoint
+  dirpath: ${hydra:runtime.output_dir}/checkpoints
+  monitor: ${monitor_metric}
+  mode: ${monitor_mode}
+  save_last: true
+  verbose: true
+
+[2026-03-13 08:56:49,285][__main__][INFO] - Instantiating LightningModule {'_target_': 'emg2qwerty.lightning.GRUCTCModule', 'in_features': 528, 'mlp_features': [384], 'hidden_size': 256, 'num_layers': 5, 'keep_channels_per_band': 4}
+[2026-03-13 08:56:50,217][__main__][INFO] - Loading module from checkpoint best_gru_test.ckpt
+[2026-03-13 08:56:51,969][__main__][INFO] - Instantiating LightningDataModule {'_target_': 'emg2qwerty.lightning.WindowedEMGDataModule', 'window_length': 8000, 'padding': [1800, 200]}
+Validation: 0it [00:00, ?it/s]Validation:   0%|          | 0/7 [00:00<?, ?it/s]Validation DataLoader 0:   0%|          | 0/7 [00:00<?, ?it/s]Validation DataLoader 0:  14%|█▍        | 1/7 [00:00<00:02,  2.01it/s]Validation DataLoader 0:  29%|██▊       | 2/7 [00:00<00:01,  2.66it/s]Validation DataLoader 0:  43%|████▎     | 3/7 [00:01<00:01,  2.26it/s]Validation DataLoader 0:  57%|█████▋    | 4/7 [00:01<00:01,  2.41it/s]Validation DataLoader 0:  71%|███████▏  | 5/7 [00:02<00:01,  1.91it/s]Validation DataLoader 0:  86%|████████▌ | 6/7 [00:02<00:00,  2.09it/s]Validation DataLoader 0: 100%|██████████| 7/7 [00:03<00:00,  2.16it/s]Validation DataLoader 0: 100%|██████████| 7/7 [00:03<00:00,  2.15it/s]
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃      Validate metric      ┃       DataLoader 0        ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│          val/CER          │    31.856447219848633     │
+│          val/DER          │     3.278688430786133     │
+│          val/IER          │     7.90872859954834      │
+│          val/SER          │    20.669029235839844     │
+│         val/loss          │    1.0020025968551636     │
+└───────────────────────────┴───────────────────────────┘
+Testing: 0it [00:00, ?it/s]Testing:   0%|          | 0/1 [00:00<?, ?it/s]Testing DataLoader 0:   0%|          | 0/1 [00:00<?, ?it/s]Testing DataLoader 0: 100%|██████████| 1/1 [00:12<00:00, 12.70s/it]Testing DataLoader 0: 100%|██████████| 1/1 [00:12<00:00, 12.71s/it]
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃        Test metric        ┃       DataLoader 0        ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│         test/CER          │     33.43418884277344     │
+│         test/DER          │    2.8312082290649414     │
+│         test/IER          │     7.521071910858154     │
+│         test/SER          │    23.081911087036133     │
+│         test/loss         │    1.0399360656738281     │
+└───────────────────────────┴───────────────────────────┘
+{'val_metrics': [{'val/loss': 1.0020025968551636,
+                  'val/CER': 31.856447219848633,
+                  'val/IER': 7.90872859954834,
+                  'val/DER': 3.278688430786133,
+                  'val/SER': 20.669029235839844}],
+ 'test_metrics': [{'test/loss': 1.0399360656738281,
+                   'test/CER': 33.43418884277344,
+                   'test/IER': 7.521071910858154,
+                   'test/DER': 2.8312082290649414,
+                   'test/SER': 23.081911087036133}],
+ 'best_checkpoint': ''}
+submitit INFO (2026-03-13 08:57:25,851) - Job completed successfully
+[2026-03-13 08:57:25,851][submitit][INFO] - Job completed successfully
+submitit INFO (2026-03-13 08:57:25,861) - Exiting after successful completion
+[2026-03-13 08:57:25,861][submitit][INFO] - Exiting after successful completion
