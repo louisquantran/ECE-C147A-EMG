@@ -260,7 +260,7 @@ module:
   in_features: 528
   mlp_features:
   - 384
-  hidden_size: 256
+  hidden_size: 384
   num_layers: 3
   bidirectional: true
   gru_dropout: 0.2
