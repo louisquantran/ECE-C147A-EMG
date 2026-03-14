@@ -1,0 +1,3 @@
+- user=single_user
+- train=False
+- trainer.accelerator=gpu

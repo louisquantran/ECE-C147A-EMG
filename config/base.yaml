@@ -12,7 +12,7 @@ seed: 1501
 batch_size: 32
 num_workers: 4  # Number of workers for dataloading
 train: True  # Whether to train or only run validation and test
-checkpoint: null # Optional path to checkpoint file
+checkpoint: /home/nikhil/proj/ECE-C147A-EMG/logs/2026-03-13/lstm_1_layer_384_hidden_sz_0_2_dropout_no_mlp/job0_trainer.devices=1,trainer.max_epochs=50,user=single_user/checkpoints/epoch=47-step=5760.ckpt # Optional path to checkpoint file
 monitor_metric: val/CER
 monitor_mode: min
 
