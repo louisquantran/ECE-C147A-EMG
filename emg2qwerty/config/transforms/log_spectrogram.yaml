@@ -27,16 +27,11 @@ add_gaussian_noise:
   _target_: emg2qwerty.transforms.AddGaussianNoise
   std: 0.01
   p: 1.0
-  
-logspec_train:
+
+logspec:
   _target_: emg2qwerty.transforms.LogSpectrogram
   n_fft: 64
   hop_length: 48  # Downsamples from 2kHz to 125Hz
-
-logspec_val:
-  _target_: emg2qwerty.transforms.LogSpectrogram
-  n_fft: 64
-  hop_length: 16  # Downsamples from 2kHz to 125Hz
 
 specaug:
   _target_: emg2qwerty.transforms.SpecAugment
@@ -50,14 +45,14 @@ transforms:
     - ${to_tensor}
     - ${band_rotation}
     - ${temporal_jitter}
-    # - ${standardize}
-    # - ${add_gaussian_noise}
-    - ${logspec_train}
+    - ${standardize}
+    - ${add_gaussian_noise}
+    - ${logspec}
     - ${specaug}
 
   val:
     - ${to_tensor}
-    # - ${standardize}
-    - ${logspec_val}
+    - ${standardize}
+    - ${logspec}
 
   test: ${transforms.val}

@@ -4,6 +4,8 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 
+import torch
+
 import logging
 import os
 import pprint
@@ -13,12 +15,12 @@ from typing import Any
 
 import hydra
 import pytorch_lightning as pl
+
 from hydra.utils import get_original_cwd, instantiate
 from omegaconf import DictConfig, ListConfig, OmegaConf
 
 from emg2qwerty import transforms, utils
 from emg2qwerty.transforms import Transform
-
 
 log = logging.getLogger(__name__)
 

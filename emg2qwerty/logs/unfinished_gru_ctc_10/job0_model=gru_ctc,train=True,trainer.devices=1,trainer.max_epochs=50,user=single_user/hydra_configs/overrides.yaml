@@ -1,0 +1,6 @@
+- model=gru_ctc
+- user=single_user
+- train=True
+- trainer.accelerator=gpu
+- trainer.devices=1
+- trainer.max_epochs=50
