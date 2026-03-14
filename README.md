@@ -23,6 +23,12 @@ python -m emg2qwerty.train model=<yaml file> user=single_user 'checkpoint="<chec
 
 ## LSTM Architecture
 
+Switch to the LSTM branch where there will be further instructions in the README of that branch.
+
+```bash
+git checkout lstm
+```
+
 ## CNN Architecture
 
 Switch to the CNN branch where there will be further instructions in the README of that branch.
@@ -72,3 +78,9 @@ git checkout data_ablation
 ```
 
 ## Sampling Rate
+
+Switch to the sampling rate branch where there will be further instructions in the README of that branch.
+
+```bash
+git checkout downsampling
+```
