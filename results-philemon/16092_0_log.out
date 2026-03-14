@@ -1,0 +1,193 @@
+submitit INFO (2026-03-14 02:06:59,438) - Starting with JobEnvironment(job_id=16092, hostname=dl-vm1, local_rank=0(1), node=0(1), global_rank=0(1))
+submitit INFO (2026-03-14 02:06:59,438) - Loading pickle: /home/phil/ECE-C147A-EMG/emg2qwerty/logs/2026-03-14/02-06-58/submitit_logs/16092/16092_submitted.pkl
+[2026-03-14 02:07:02,311][__main__][INFO] - 
+Config:
+user: single_user
+dataset:
+  train:
+  - user: 89335547
+    session: 2021-06-03-1622765527-keystrokes-dca-study@1-0efbe614-9ae6-4131-9192-4398359b4f5f
+  - user: 89335547
+    session: 2021-06-02-1622681518-keystrokes-dca-study@1-0efbe614-9ae6-4131-9192-4398359b4f5f
+  - user: 89335547
+    session: 2021-06-04-1622863166-keystrokes-dca-study@1-0efbe614-9ae6-4131-9192-4398359b4f5f
+  - user: 89335547
+    session: 2021-07-22-1627003020-keystrokes-dca-study@1-0efbe614-9ae6-4131-9192-4398359b4f5f
+  - user: 89335547
+    session: 2021-07-21-1626916256-keystrokes-dca-study@1-0efbe614-9ae6-4131-9192-4398359b4f5f
+  - user: 89335547
+    session: 2021-07-22-1627004019-keystrokes-dca-study@1-0efbe614-9ae6-4131-9192-4398359b4f5f
+  - user: 89335547
+    session: 2021-06-05-1622885888-keystrokes-dca-study@1-0efbe614-9ae6-4131-9192-4398359b4f5f
+  - user: 89335547
+    session: 2021-06-02-1622679967-keystrokes-dca-study@1-0efbe614-9ae6-4131-9192-4398359b4f5f
+  - user: 89335547
+    session: 2021-06-03-1622764398-keystrokes-dca-study@1-0efbe614-9ae6-4131-9192-4398359b4f5f
+  - user: 89335547
+    session: 2021-07-21-1626917264-keystrokes-dca-study@1-0efbe614-9ae6-4131-9192-4398359b4f5f
+  - user: 89335547
+    session: 2021-06-05-1622889105-keystrokes-dca-study@1-0efbe614-9ae6-4131-9192-4398359b4f5f
+  - user: 89335547
+    session: 2021-06-03-1622766673-keystrokes-dca-study@1-0efbe614-9ae6-4131-9192-4398359b4f5f
+  - user: 89335547
+    session: 2021-06-04-1622861066-keystrokes-dca-study@1-0efbe614-9ae6-4131-9192-4398359b4f5f
+  - user: 89335547
+    session: 2021-07-22-1627001995-keystrokes-dca-study@1-0efbe614-9ae6-4131-9192-4398359b4f5f
+  - user: 89335547
+    session: 2021-06-05-1622884635-keystrokes-dca-study@1-0efbe614-9ae6-4131-9192-4398359b4f5f
+  - user: 89335547
+    session: 2021-07-21-1626915176-keystrokes-dca-study@1-0efbe614-9ae6-4131-9192-4398359b4f5f
+  val:
+  - user: 89335547
+    session: 2021-06-04-1622862148-keystrokes-dca-study@1-0efbe614-9ae6-4131-9192-4398359b4f5f
+  test:
+  - user: 89335547
+    session: 2021-06-02-1622682789-keystrokes-dca-study@1-0efbe614-9ae6-4131-9192-4398359b4f5f
+  root: ${hydra:runtime.cwd}/data
+to_tensor:
+  _target_: emg2qwerty.transforms.ToTensor
+  fields:
+  - emg_left
+  - emg_right
+band_rotation:
+  _target_: emg2qwerty.transforms.ForEach
+  transform:
+    _target_: emg2qwerty.transforms.RandomBandRotation
+    offsets:
+    - -1
+    - 0
+    - 1
+temporal_jitter:
+  _target_: emg2qwerty.transforms.TemporalAlignmentJitter
+  max_offset: 120
+logspec:
+  _target_: emg2qwerty.transforms.LogSpectrogram
+  n_fft: 64
+  hop_length: 16
+specaug:
+  _target_: emg2qwerty.transforms.SpecAugment
+  n_time_masks: 3
+  time_mask_param: 25
+  n_freq_masks: 2
+  freq_mask_param: 4
+transforms:
+  train:
+  - ${to_tensor}
+  - ${band_rotation}
+  - ${temporal_jitter}
+  - ${logspec}
+  - ${specaug}
+  val:
+  - ${to_tensor}
+  - ${logspec}
+  test: ${transforms.val}
+module:
+  _target_: emg2qwerty.lightning.TCNCTCModule
+  in_features: 528
+  mlp_features:
+  - 384
+  num_channels:
+  - 192
+  - 192
+  - 192
+  - 192
+  kernel_size: 7
+  dropout: 0.2
+optimizer:
+  _target_: torch.optim.Adam
+  lr: 0.001
+  weight_decay: 0.0001
+datamodule:
+  _target_: emg2qwerty.lightning.WindowedEMGDataModule
+  window_length: 8000
+  padding:
+  - 1800
+  - 200
+lr_scheduler:
+  scheduler:
+    _target_: pl_bolts.optimizers.lr_scheduler.LinearWarmupCosineAnnealingLR
+    warmup_epochs: 10
+    max_epochs: ${trainer.max_epochs}
+    warmup_start_lr: 1.0e-08
+    eta_min: 1.0e-06
+  interval: epoch
+decoder:
+  _target_: emg2qwerty.decoder.CTCGreedyDecoder
+seed: 1501
+batch_size: 32
+num_workers: 4
+train: false
+checkpoint: /home/phil/ECE-C147A-EMG/emg2qwerty/logs/2026-03-09/04-07-43/job0_model=tcn,trainer.devices=1,trainer.max_epochs=50,user=single_user/checkpoints/epoch=44-step=5400.ckpt
+monitor_metric: val/CER
+monitor_mode: min
+trainer:
+  accelerator: gpu
+  devices: 1
+  num_nodes: 1
+  max_epochs: 150
+  default_root_dir: ${hydra:runtime.output_dir}
+callbacks:
+- _target_: pytorch_lightning.callbacks.LearningRateMonitor
+- _target_: pytorch_lightning.callbacks.ModelCheckpoint
+  dirpath: ${hydra:runtime.output_dir}/checkpoints
+  monitor: ${monitor_metric}
+  mode: ${monitor_mode}
+  save_last: true
+  verbose: true
+
+[2026-03-14 02:07:02,313][__main__][INFO] - Instantiating LightningModule {'_target_': 'emg2qwerty.lightning.TCNCTCModule', 'in_features': 528, 'mlp_features': [384], 'num_channels': [192, 256, 256, 256, 256, 384], 'kernel_size': 9, 'dropout': 0.25}
+TCN MODEL INITIALIZED
+[2026-03-14 02:07:02,574][__main__][INFO] - Loading module from checkpoint /home/phil/ECE-C147A-EMG/emg2qwerty/logs/2026-03-09/04-07-43/job0_model=tcn,trainer.devices=1,trainer.max_epochs=50,user=single_user/checkpoints/epoch=44-step=5400.ckpt
+TCN MODEL INITIALIZED
+[2026-03-14 02:07:03,989][__main__][INFO] - Instantiating LightningDataModule {'_target_': 'emg2qwerty.lightning.WindowedEMGDataModule', 'window_length': 8000, 'padding': [1800, 200]}
+
+Validation: 0it [00:00, ?it/s]
+Validation:   0%|          | 0/7 [00:00<?, ?it/s]
+Validation DataLoader 0:   0%|          | 0/7 [00:00<?, ?it/s]
+Validation DataLoader 0:  14%|█▍        | 1/7 [00:00<00:05,  1.14it/s]
+Validation DataLoader 0:  29%|██▊       | 2/7 [00:01<00:02,  1.99it/s]
+Validation DataLoader 0:  43%|████▎     | 3/7 [00:01<00:01,  2.68it/s]
+Validation DataLoader 0:  57%|█████▋    | 4/7 [00:01<00:00,  3.31it/s]
+Validation DataLoader 0:  71%|███████▏  | 5/7 [00:01<00:00,  3.85it/s]
+Validation DataLoader 0:  86%|████████▌ | 6/7 [00:01<00:00,  4.33it/s]
+Validation DataLoader 0: 100%|██████████| 7/7 [00:01<00:00,  4.86it/s]
+Validation DataLoader 0: 100%|██████████| 7/7 [00:01<00:00,  4.84it/s]
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃      Validate metric      ┃       DataLoader 0        ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│          val/CER          │    22.795745849609375     │
+│          val/DER          │    2.1267168521881104     │
+│          val/IER          │     8.21887493133545      │
+│          val/SER          │    12.450155258178711     │
+│         val/loss          │    0.7748957276344299     │
+└───────────────────────────┴───────────────────────────┘
+
+Testing: 0it [00:00, ?it/s]
+Testing:   0%|          | 0/1 [00:00<?, ?it/s]
+Testing DataLoader 0:   0%|          | 0/1 [00:00<?, ?it/s]
+Testing DataLoader 0: 100%|██████████| 1/1 [00:02<00:00,  2.09s/it]
+Testing DataLoader 0: 100%|██████████| 1/1 [00:02<00:00,  2.10s/it]
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃        Test metric        ┃       DataLoader 0        ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│         test/CER          │     23.25480842590332     │
+│         test/DER          │     1.404797911643982     │
+│         test/IER          │     8.169440269470215     │
+│         test/SER          │    13.680570602416992     │
+│         test/loss         │    0.7589484453201294     │
+└───────────────────────────┴───────────────────────────┘
+{'val_metrics': [{'val/loss': 0.7748957276344299,
+                  'val/CER': 22.795745849609375,
+                  'val/IER': 8.21887493133545,
+                  'val/DER': 2.1267168521881104,
+                  'val/SER': 12.450155258178711}],
+ 'test_metrics': [{'test/loss': 0.7589484453201294,
+                   'test/CER': 23.25480842590332,
+                   'test/IER': 8.169440269470215,
+                   'test/DER': 1.404797911643982,
+                   'test/SER': 13.680570602416992}],
+ 'best_checkpoint': ''}
+submitit INFO (2026-03-14 02:07:16,093) - Job completed successfully
+[2026-03-14 02:07:16,093][submitit][INFO] - Job completed successfully
+submitit INFO (2026-03-14 02:07:16,099) - Exiting after successful completion
+[2026-03-14 02:07:16,099][submitit][INFO] - Exiting after successful completion
