@@ -18,7 +18,7 @@ python -m emg2qwerty.train --multirun model=<yaml file> user=single_user trainer
 
 4. To obtain the test CER, the following command was used:
 ```bash
-python -m emg2qwerty.train model=gru_ctc user=single_user 'checkpoint="<checkpoint path>"' train=False trainer.accelerator=gpu trainer.devices=1
+python -m emg2qwerty.train model=<yaml file> user=single_user 'checkpoint="<checkpoint path>"' train=False trainer.accelerator=gpu trainer.devices=1
 ```
 
 ## LSTM Architecture
