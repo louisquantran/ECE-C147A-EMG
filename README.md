@@ -15,11 +15,13 @@ conda activate emg2qwerty
 ```bash
 python -m emg2qwerty.train --multirun model=<yaml file> user=single_user trainer.accelerator=gpu trainer.devices=1 trainer.max_epochs=50
 ```
+For `<yaml file>`, look into `/emg2qwerty/config/model/*.yaml`, chose one, remove `.yaml`, and replace `<yaml file>` with the removed file name.
 
 4. To obtain the test CER, the following command was used:
 ```bash
 python -m emg2qwerty.train model=<yaml file> user=single_user 'checkpoint="<checkpoint path>"' train=False trainer.accelerator=gpu trainer.devices=1
 ```
+For `<checkpoint path>`, each training will produce a log folder, containing the checkpoint and the detailed logs. Use the full file path for the best checkpoint.
 
 ## LSTM Architecture
 
