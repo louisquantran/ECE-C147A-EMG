@@ -2,9 +2,9 @@
 
 ## LSTM Architecture
 
-To reproduce the TCN architecture experiments:
+To reproduce the LSTM architecture experiments:
 
-1. Switch to the TCN branch:
+1. Switch to the LSTM branch:
 
 ```bash
 git checkout lstm
