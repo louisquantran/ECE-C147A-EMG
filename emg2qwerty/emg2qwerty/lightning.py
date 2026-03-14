@@ -22,11 +22,10 @@ from emg2qwerty.charset import charset
 from emg2qwerty.data import LabelData, WindowedEMGDataset
 from emg2qwerty.metrics import CharacterErrorRates
 from emg2qwerty.modules import (
-    TDSGRUEncoder,
     MultiBandRotationInvariantMLP,
     SpectrogramNorm,
     TDSConvEncoder,
-    TemporalConv1D,
+    TDSGRUEncoder,
 )
 from emg2qwerty.transforms import Transform
 
@@ -92,7 +91,7 @@ class WindowedEMGDataModule(pl.LightningDataModule):
                     hdf5_path,
                     transform=self.test_transform,
                     # Feed the entire session at once without windowing/padding
-                    # at test time for more realism
+                    # at test time for more realism.
                     window_length=None,
                     padding=(0, 0),
                     jitter=False,
@@ -109,7 +108,7 @@ class WindowedEMGDataModule(pl.LightningDataModule):
             num_workers=self.num_workers,
             collate_fn=WindowedEMGDataset.collate,
             pin_memory=True,
-            persistent_workers=True,
+            persistent_workers=self.num_workers > 0,
         )
 
     def val_dataloader(self) -> DataLoader:
@@ -120,14 +119,13 @@ class WindowedEMGDataModule(pl.LightningDataModule):
             num_workers=self.num_workers,
             collate_fn=WindowedEMGDataset.collate,
             pin_memory=True,
-            persistent_workers=True,
+            persistent_workers=self.num_workers > 0,
         )
 
     def test_dataloader(self) -> DataLoader:
         # Test dataset does not involve windowing and entire sessions are
         # fed at once. Limit batch size to 1 to fit within GPU memory and
-        # avoid any influence of padding (while collating multiple batch items)
-        # in test scores.
+        # avoid any influence of padding while collating multiple items.
         return DataLoader(
             self.test_dataset,
             batch_size=1,
@@ -135,7 +133,7 @@ class WindowedEMGDataModule(pl.LightningDataModule):
             num_workers=self.num_workers,
             collate_fn=WindowedEMGDataset.collate,
             pin_memory=True,
-            persistent_workers=True,
+            persistent_workers=self.num_workers > 0,
         )
 
 
@@ -158,154 +156,19 @@ class TDSConvCTCModule(pl.LightningModule):
 
         num_features = self.NUM_BANDS * mlp_features[-1]
 
-        # Model
-        # inputs: (T, N, bands=2, electrode_channels=16, freq)
         self.model = nn.Sequential(
-            # (T, N, bands=2, C=16, freq)
             SpectrogramNorm(channels=self.NUM_BANDS * self.ELECTRODE_CHANNELS),
-            # (T, N, bands=2, mlp_features[-1])
             MultiBandRotationInvariantMLP(
                 in_features=in_features,
                 mlp_features=mlp_features,
                 num_bands=self.NUM_BANDS,
             ),
-            # (T, N, num_features)
             nn.Flatten(start_dim=2),
             TDSConvEncoder(
                 num_features=num_features,
                 block_channels=block_channels,
                 kernel_width=kernel_width,
             ),
-            # (T, N, num_classes)
-            nn.Linear(num_features, charset().num_classes),
-            nn.LogSoftmax(dim=-1),
-        )
-
-        # Criterion
-        self.ctc_loss = nn.CTCLoss(blank=charset().null_class)
-
-        # Decoder
-        self.decoder = instantiate(decoder)
-
-        # Metrics
-        metrics = MetricCollection([CharacterErrorRates()])
-        self.metrics = nn.ModuleDict(
-            {
-                f"{phase}_metrics": metrics.clone(prefix=f"{phase}/")
-                for phase in ["train", "val", "test"]
-            }
-        )
-
-    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
-        return self.model(inputs)
-
-    def _step(
-        self, phase: str, batch: dict[str, torch.Tensor], *args, **kwargs
-    ) -> torch.Tensor:
-        inputs = batch["inputs"]
-        targets = batch["targets"]
-        input_lengths = batch["input_lengths"]
-        target_lengths = batch["target_lengths"]
-        N = len(input_lengths)  # batch_size
-
-        emissions = self.forward(inputs)
-
-        # Shrink input lengths by an amount equivalent to the conv encoder's
-        # temporal receptive field to compute output activation lengths for CTCLoss.
-        # NOTE: This assumes the encoder doesn't perform any temporal downsampling
-        # such as by striding.
-        T_diff = inputs.shape[0] - emissions.shape[0]
-        emission_lengths = input_lengths - T_diff
-
-        loss = self.ctc_loss(
-            log_probs=emissions,  # (T, N, num_classes)
-            targets=targets.transpose(0, 1),  # (T, N) -> (N, T)
-            input_lengths=emission_lengths,  # (N,)
-            target_lengths=target_lengths,  # (N,)
-        )
-
-        # Decode emissions
-        predictions = self.decoder.decode_batch(
-            emissions=emissions.detach().cpu().numpy(),
-            emission_lengths=emission_lengths.detach().cpu().numpy(),
-        )
-
-        # Update metrics
-        metrics = self.metrics[f"{phase}_metrics"]
-        targets = targets.detach().cpu().numpy()
-        target_lengths = target_lengths.detach().cpu().numpy()
-        for i in range(N):
-            # Unpad targets (T, N) for batch entry
-            target = LabelData.from_labels(targets[: target_lengths[i], i])
-            metrics.update(prediction=predictions[i], target=target)
-
-        self.log(f"{phase}/loss", loss, batch_size=N, sync_dist=True)
-        return loss
-
-    def _epoch_end(self, phase: str) -> None:
-        metrics = self.metrics[f"{phase}_metrics"]
-        self.log_dict(metrics.compute(), sync_dist=True)
-        metrics.reset()
-
-    def training_step(self, *args, **kwargs) -> torch.Tensor:
-        return self._step("train", *args, **kwargs)
-
-    def validation_step(self, *args, **kwargs) -> torch.Tensor:
-        return self._step("val", *args, **kwargs)
-
-    def test_step(self, *args, **kwargs) -> torch.Tensor:
-        return self._step("test", *args, **kwargs)
-
-    def on_train_epoch_end(self) -> None:
-        self._epoch_end("train")
-
-    def on_validation_epoch_end(self) -> None:
-        self._epoch_end("val")
-
-    def on_test_epoch_end(self) -> None:
-        self._epoch_end("test")
-
-    def configure_optimizers(self) -> dict[str, Any]:
-        return utils.instantiate_optimizer_and_scheduler(
-            self.parameters(),
-            optimizer_config=self.hparams.optimizer,
-            lr_scheduler_config=self.hparams.lr_scheduler,
-        )
-
-class GRUCTCModule(pl.LightningModule):
-    NUM_BANDS: ClassVar[int] = 2
-    ELECTRODE_CHANNELS: ClassVar[int] = 16
-
-    def __init__(
-        self,
-        in_features: int,
-        mlp_features: Sequence[int],
-        hidden_size: int,
-        num_layers: int,
-        optimizer: DictConfig,
-        lr_scheduler: DictConfig,
-        decoder: DictConfig,
-    ) -> None:
-        super().__init__()
-        self.save_hyperparameters()
-
-        num_features = self.NUM_BANDS * mlp_features[-1]
-
-        self.encoder = TDSGRUEncoder(
-            num_features=num_features,
-            rnn_hidden_size=hidden_size,
-            num_rnn_layers=num_layers,
-        )
-
-        self.model = nn.Sequential(
-            SpectrogramNorm(channels=self.NUM_BANDS * self.ELECTRODE_CHANNELS),
-            MultiBandRotationInvariantMLP(
-                in_features=in_features,
-                mlp_features=mlp_features,
-                num_bands=self.NUM_BANDS,
-            ),
-            nn.Flatten(start_dim=2),
-            self.encoder,
             nn.Linear(num_features, charset().num_classes),
             nn.LogSoftmax(dim=-1),
         )
@@ -334,7 +197,10 @@ class GRUCTCModule(pl.LightningModule):
         N = len(input_lengths)
 
         emissions = self.forward(inputs)
-        emission_lengths = input_lengths
+
+        # TDSConvEncoder reduces time length depending on kernel width.
+        T_diff = inputs.shape[0] - emissions.shape[0]
+        emission_lengths = input_lengths - T_diff
 
         loss = self.ctc_loss(
             log_probs=emissions,
@@ -388,8 +254,9 @@ class GRUCTCModule(pl.LightningModule):
             optimizer_config=self.hparams.optimizer,
             lr_scheduler_config=self.hparams.lr_scheduler,
         )
-        
-class CNNGRUCTCModule(pl.LightningModule):
+
+
+class GRUCTCModule(pl.LightningModule):
     NUM_BANDS: ClassVar[int] = 2
     ELECTRODE_CHANNELS: ClassVar[int] = 16
 
@@ -397,37 +264,23 @@ class CNNGRUCTCModule(pl.LightningModule):
         self,
         in_features: int,
         mlp_features: Sequence[int],
-        conv_channels: int,
-        conv_kernel_size: int,
-        conv_num_layers: int,
-        conv_dropout: float,
         hidden_size: int,
         num_layers: int,
-        bidirectional: bool,
-        gru_dropout: float,
+        keep_channels_per_band: int,
         optimizer: DictConfig,
         lr_scheduler: DictConfig,
         decoder: DictConfig,
     ) -> None:
         super().__init__()
         self.save_hyperparameters()
+        self.keep_channels_per_band = keep_channels_per_band
 
-        frontend_features = self.NUM_BANDS * mlp_features[-1]
+        num_features = self.NUM_BANDS * mlp_features[-1]
 
-        self.temporal_conv = TemporalConv1D(
-            in_channels=frontend_features,
-            conv_channels=conv_channels,
-            kernel_size=conv_kernel_size,
-            num_layers=conv_num_layers,
-            dropout=conv_dropout,
-        )
-
-        self.encoder = GRUEncoder(
-            num_features=self.temporal_conv.output_features,
-            hidden_size=hidden_size,
-            num_layers=num_layers,
-            bidirectional=bidirectional,
-            dropout=gru_dropout,
+        self.encoder = TDSGRUEncoder(
+            num_features=num_features,
+            rnn_hidden_size=hidden_size,
+            num_rnn_layers=num_layers,
         )
 
         self.model = nn.Sequential(
@@ -437,10 +290,9 @@ class CNNGRUCTCModule(pl.LightningModule):
                 mlp_features=mlp_features,
                 num_bands=self.NUM_BANDS,
             ),
-            nn.Flatten(start_dim=2),  # (T, N, frontend_features)
-            self.temporal_conv,       # (T, N, conv_channels)
-            self.encoder,             # (T, N, hidden*dirs)
-            nn.Linear(self.encoder.output_features, charset().num_classes),
+            nn.Flatten(start_dim=2),
+            self.encoder,
+            nn.Linear(num_features, charset().num_classes),
             nn.LogSoftmax(dim=-1),
         )
 
@@ -455,7 +307,18 @@ class CNNGRUCTCModule(pl.LightningModule):
             }
         )
 
+    def _mask_channels(self, inputs: torch.Tensor) -> torch.Tensor:
+        k = self.keep_channels_per_band
+        if k >= self.ELECTRODE_CHANNELS:
+            return inputs
+
+        # inputs shape: (T, N, bands=2, channels=16, freq)
+        x = inputs.clone()
+        x[:, :, :, k:, ...] = 0
+        return x
+
     def forward(self, inputs: torch.Tensor) -> torch.Tensor:
+        inputs = self._mask_channels(inputs)
         return self.model(inputs)
 
     def _step(
@@ -469,7 +332,7 @@ class CNNGRUCTCModule(pl.LightningModule):
 
         emissions = self.forward(inputs)
 
-        # temporal conv uses same-length padding, GRU preserves time length
+        # GRU preserves time length.
         emission_lengths = input_lengths
 
         loss = self.ctc_loss(
@@ -487,6 +350,7 @@ class CNNGRUCTCModule(pl.LightningModule):
         metrics = self.metrics[f"{phase}_metrics"]
         targets_np = targets.detach().cpu().numpy()
         target_lengths_np = target_lengths.detach().cpu().numpy()
+
         for i in range(N):
             target = LabelData.from_labels(targets_np[: target_lengths_np[i], i])
             metrics.update(prediction=predictions[i], target=target)
