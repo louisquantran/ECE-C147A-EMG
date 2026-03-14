@@ -31,7 +31,7 @@ add_gaussian_noise:
 logspec:
   _target_: emg2qwerty.transforms.LogSpectrogram
   n_fft: 64
-  hop_length: 48  # Downsamples from 2kHz to 125Hz
+  hop_length: 16  # Downsamples from 2kHz to 125Hz
 
 specaug:
   _target_: emg2qwerty.transforms.SpecAugment

@@ -12,7 +12,7 @@ seed: 1501
 batch_size: 32
 num_workers: 4  # Number of workers for dataloading
 train: True  # Whether to train or only run validation and test
-checkpoint: /home/nikhil/proj/ECE-C147A-EMG/emg2qwerty/logs/gru_ctc_48_noise_standardized/job0_model=gru_ctc,train=True,trainer.devices=1,trainer.max_epochs=50,user=single_user/checkpoints/epoch=49-step=6000.ckpt # Optional path to checkpoint file
+checkpoint: null # Optional path to checkpoint file
 monitor_metric: val/CER
 monitor_mode: min
 
