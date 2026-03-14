@@ -25,6 +25,12 @@ python -m emg2qwerty.train model=gru_ctc user=single_user 'checkpoint="<checkpoi
 
 ## CNN Architecture
 
+Switch to the CNN branch where there will be further instructions in the README of that branch.
+
+```bash
+git checkout feature/cnn
+```
+
 ## TCN Architecture
 
 Switch to the TCN branch where there will be further instructions in the README of that branch.
@@ -51,9 +57,15 @@ git checkout prepro_augment
 
 ## Channel Ablation
 
+Switch to the channel ablation branch where there will be further instructions in the README of that branch.
+
+```bash
+git checkout channel_ablation
+```
+
 ## Data Ablation
 
-Switch to the Data Ablation branch where there will be further instructions in the README of that branch.
+Switch to the data ablation branch where there will be further instructions in the README of that branch.
 
 ```bash
 git checkout data_ablation
